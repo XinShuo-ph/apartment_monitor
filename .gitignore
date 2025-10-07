@@ -1,0 +1,35 @@
+# Secrets and credentials
+secrets/
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Runtime data
+available_apartments.json
+available_apartments.txt
+
+# Scratch/Debug files
+scratch/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
