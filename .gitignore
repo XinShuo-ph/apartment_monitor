@@ -13,9 +13,6 @@ __pycache__/
 dist/
 build/
 
-# Runtime data
-available_apartments.json
-available_apartments.txt
 
 # Scratch/Debug files
 scratch/

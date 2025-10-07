@@ -1,0 +1,48 @@
+================================================================================
+AVAILABLE APARTMENTS
+Last Updated: 2025-10-07 15:10:13
+Total Units: 22
+================================================================================
+
+Floor Plan A (1 units):
+  #758
+
+Floor Plan B (1 units):
+  #695
+
+Floor Plan C (1 units):
+  #636
+
+Floor Plan F (1 units):
+  #333
+
+Floor Plan G (4 units):
+  #452
+  #493
+  #525
+  #730
+
+Floor Plan I (3 units):
+  #594
+  #670
+  #792
+
+Floor Plan J (7 units):
+  #477
+  #506
+  #581
+  #606
+  #671
+  #765
+  #779
+
+Floor Plan N (1 units):
+  #322
+
+Floor Plan O (2 units):
+  #328
+  #410
+
+Floor Plan U (1 units):
+  #499
+
