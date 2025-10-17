@@ -1,6 +1,6 @@
 # Apartment Availability Monitor
 
-Automated apartment availability monitoring for Hanover Winchester apartments. Sends real-time notifications via WeChat and Email when apartments become available or are removed.
+Automated apartment availability monitoring for Windsor Winchester apartments. Sends real-time notifications via WeChat and Email when apartments become available or are removed.
 
 ## Features
 
@@ -219,7 +219,7 @@ brew upgrade chromedriver
 ### No Apartments Detected
 
 - Check your internet connection
-- Verify the website is accessible: https://hanoverwinchester.com/floorplans/
+- Verify the website is accessible: https://windsorwinchester.com/floorplans/
 - Run with `--no-headless` to see browser activity
 
 ## Technologies Used
