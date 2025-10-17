@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Apartment Availability Monitor
-Monitors https://hanoverwinchester.com/floorplans/ for apartment availability changes
+Monitors https://www.windsorcommunities.com/properties/windsor-winchester/floorplans/ for apartment availability changes
 Checks every 20 seconds and notifies when changes are detected
 """
 
@@ -22,6 +22,8 @@ try:
     from selenium import webdriver
     from selenium.webdriver.chrome.options import Options as ChromeOptions
     from selenium.webdriver.common.by import By
+    from selenium.webdriver.support.ui import WebDriverWait
+    from selenium.webdriver.support import expected_conditions as EC
     SELENIUM_AVAILABLE = True
 except ImportError:
     SELENIUM_AVAILABLE = False
@@ -32,6 +34,7 @@ class ApartmentMonitor:
     def __init__(self, url: str, check_interval: int = 20, headless: bool = True, 
                  wechat_token: Optional[str] = None, wechat_method: str = 'pushplus',
                  notify_floor_plans: Optional[List[str]] = None,
+                 notify_min_bedrooms: Optional[int] = None,
                  email_to: Optional[List[str]] = None, email_from: Optional[str] = None,
                  smtp_server: Optional[str] = None, smtp_port: int = 587,
                  smtp_password: Optional[str] = None):
@@ -44,8 +47,9 @@ class ApartmentMonitor:
             headless: Whether to run browser in headless mode
             wechat_token: Token for WeChat notifications (optional)
             wechat_method: Method for WeChat notifications ('pushplus', 'serverchan', or 'work')
-            notify_floor_plans: List of floor plans to notify about (e.g. ['N', 'O', 'P']). 
-                              If None, notify about all. Case-insensitive.
+            notify_floor_plans: List of floor plans to notify about (e.g. ['A', 'B']). 
+                              If None, do not filter by plan letters.
+            notify_min_bedrooms: If set, only notify for units with this many bedrooms or more.
             email_to: List of email addresses to send notifications to (or single string)
             email_from: Email address to send from
             smtp_server: SMTP server address
@@ -59,6 +63,7 @@ class ApartmentMonitor:
         self.wechat_token = wechat_token
         self.wechat_method = wechat_method
         self.notify_floor_plans = [p.upper() for p in notify_floor_plans] if notify_floor_plans else None
+        self.notify_min_bedrooms = notify_min_bedrooms
         
         # Handle email_to as either string or list
         if isinstance(email_to, str):
@@ -91,6 +96,13 @@ class ApartmentMonitor:
             options.add_argument('--disable-gpu')
             options.add_argument('--window-size=1920,1080')
             options.add_argument('--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+            # Use an isolated user data dir to avoid conflicts in shared envs
+            tmp_profile = os.path.join('/tmp', f'selenium-profile-{os.getpid()}')
+            try:
+                os.makedirs(tmp_profile, exist_ok=True)
+                options.add_argument(f'--user-data-dir={tmp_profile}')
+            except Exception:
+                pass
             
             self.driver = webdriver.Chrome(options=options)
             return True
@@ -98,58 +110,68 @@ class ApartmentMonitor:
             print(f"❌ Error setting up Chrome driver: {e}")
             return False
     
-    def check_floor_plan(self, plan_name: str) -> List[str]:
+    def _parse_units_from_windsor_page(self) -> Dict[str, dict]:
         """
-        Check a specific floor plan for available units by parsing embedded JSON data
+        Parse available units from Windsor Communities floorplans page.
+        Uses the Spaces plugin markup: article.spaces-unit elements with data attributes.
         
-        Args:
-            plan_name: Name of the floor plan (e.g., 'a', 'b', 'c')
-            
         Returns:
-            List of available unit numbers
+            Dictionary mapping unit numbers (e.g., '#758') to details including floor plan code
         """
+        all_units: Dict[str, dict] = {}
         try:
-            # Navigate to the floor plan page with # to trigger availability display
-            url = f"https://hanoverwinchester.com/floorplans/{plan_name.lower()}/#"
+            # Ensure we're on the Units tab
+            url = self.url + ("&" if "?" in self.url else "?") + "spaces_tab=unit"
             self.driver.get(url)
-            time.sleep(3)  # Wait for page and JavaScript to load
-            
-            # Find all script tags with unit data
-            unit_scripts = self.driver.find_elements(
-                By.CSS_SELECTOR, 
-                'script[type="application/json"][data-jd-fp-selector="unit-data"]'
+
+            # Wait for unit cards to be present
+            try:
+                WebDriverWait(self.driver, 15).until(
+                    EC.presence_of_element_located((By.CSS_SELECTOR, 'article.spaces-unit'))
+                )
+            except Exception:
+                # Fallback small sleep in case of slow load
+                time.sleep(3)
+
+            unit_cards = self.driver.find_elements(
+                By.CSS_SELECTOR,
+                'article.spaces-unit[data-spaces-available="true"]'
             )
-            
-            units = []
-            for script in unit_scripts:
-                try:
-                    # Parse the JSON data
-                    json_text = script.get_attribute('textContent')
-                    if json_text:
-                        data = json.loads(json_text)
-                        
-                        # Extract the unit number
-                        # It can be in 'apartment_number' or 'title' field
-                        unit_num = data.get('apartment_number') or data.get('title', '')
-                        
-                        # Format as #XXX if it's not already
-                        if unit_num and not unit_num.startswith('#'):
-                            unit_num = f"#{unit_num}"
-                        
-                        if unit_num and unit_num not in units:
-                            units.append(unit_num)
-                            
-                except (json.JSONDecodeError, KeyError) as e:
+
+            for card in unit_cards:
+                unit_num_raw = card.get_attribute('data-spaces-unit') or ''
+                if not unit_num_raw:
+                    # Fallback from aria-label like "Unit 758"
+                    aria = card.get_attribute('aria-label') or ''
+                    m = re.search(r'Unit\s*(\w+)', aria)
+                    unit_num_raw = m.group(1) if m else ''
+
+                if not unit_num_raw:
                     continue
-            
-            return sorted(units)
-            
+
+                unit_num = unit_num_raw if str(unit_num_raw).startswith('#') else f"#{unit_num_raw}"
+                plan_code = (card.get_attribute('data-spaces-sort-plan-name') or '').upper() or 'UNKNOWN'
+                try:
+                    beds_attr = card.get_attribute('data-spaces-sort-bed')
+                    bedrooms = int(beds_attr) if beds_attr is not None else None
+                except Exception:
+                    bedrooms = None
+
+                all_units[unit_num] = {
+                    'unit': unit_num,
+                    'floor_plan': plan_code,
+                    'bedrooms': bedrooms,
+                    'last_seen': datetime.now().isoformat()
+                }
+
         except Exception as e:
-            return []
+            print(f"⚠️  Failed to parse units from Windsor page: {e}")
+        
+        return all_units
     
     def fetch_available_units(self) -> Dict[str, dict]:
         """
-        Fetch all available units across all floor plans
+        Fetch all available units from the Windsor Winchester floorplans page.
         
         Returns:
             Dictionary mapping unit numbers to their details
@@ -157,33 +179,18 @@ class ApartmentMonitor:
         if not self.driver:
             if not self.setup_driver():
                 return {}
-        
-        all_units = {}
-        
-        for plan_name in self.floor_plans:
-            try:
-                idx = self.floor_plans.index(plan_name) + 1
-                total = len(self.floor_plans)
-                print(f"   [{idx}/{total}] Checking {plan_name.upper()}... ", end='', flush=True)
-                
-                units = self.check_floor_plan(plan_name)
-                
-                if units:
-                    print(f"✓ {len(units)} units: {', '.join(units)}")
-                    for unit_num in units:
-                        all_units[unit_num] = {
-                            'unit': unit_num,
-                            'floor_plan': plan_name.upper(),
-                            'last_seen': datetime.now().isoformat()
-                        }
-                else:
-                    print("No units")
-                    
-            except Exception as e:
-                print(f"Error: {e}")
-                continue
-        
-        return all_units
+
+        print("   Loading Windsor Winchester floorplans page...", flush=True)
+        units = self._parse_units_from_windsor_page()
+
+        # Optional filters
+        if self.notify_floor_plans:
+            units = {k: v for k, v in units.items() if v['floor_plan'] in self.notify_floor_plans}
+        if self.notify_min_bedrooms is not None:
+            units = {k: v for k, v in units.items() if v.get('bedrooms') is not None and v.get('bedrooms') >= self.notify_min_bedrooms}
+
+        print(f"   ✓ Found {len(units)} available units")
+        return units
     
     def compare_units(self, current: Dict[str, dict], previous: Dict[str, dict]) -> Dict[str, List]:
         """Compare current and previous unit data"""
@@ -537,8 +544,8 @@ class ApartmentMonitor:
             self.previous_units = loaded_units
             print(f"✓ Loaded {len(loaded_units)} units from previous run")
         
-        print(f"\nℹ️  Will check {len(self.floor_plans)} floor plans for available units")
-        print("   First check may take 2-3 minutes...")
+        print(f"\nℹ️  Checking current availability from Windsor Winchester")
+        print("   First check may take 30-60 seconds...")
         print("   Results will be saved to: available_apartments.txt")
         print("\nPress Ctrl+C to stop monitoring...")
         print("="*80)
@@ -658,7 +665,7 @@ class ApartmentMonitor:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Monitor apartment availability on Hanover Winchester',
+        description='Monitor apartment availability on Windsor Winchester',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -698,7 +705,7 @@ Examples:
     
     args = parser.parse_args()
     
-    url = "https://hanoverwinchester.com/floorplans/"
+    url = "https://www.windsorcommunities.com/properties/windsor-winchester/floorplans/"
     
     # Read WeChat token from secrets folder or environment variable
     wechat_token = None
@@ -744,8 +751,9 @@ Examples:
         except Exception as e:
             print(f"⚠️  Failed to read email config from {email_config_file}: {e}")
     
-    # Only notify for 2+ bedroom floor plans (N, O, P, Q, R, S, T, U, V)
-    notify_floor_plans = ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V']
+    # Only notify for 2+ bedroom homes by default
+    notify_floor_plans = None  # e.g., ['A','B'] if you want to filter by plan letters
+    notify_min_bedrooms = 2
     
     # Print configuration status
     notifications_enabled = []
@@ -760,7 +768,12 @@ Examples:
     
     if notifications_enabled:
         print(f"✅ Notifications enabled: {', '.join(notifications_enabled)}")
-        print(f"ℹ️  Notification filter: Floor Plans {', '.join(notify_floor_plans)} only")
+        filter_parts = []
+        if notify_floor_plans:
+            filter_parts.append(f"Plans {', '.join(notify_floor_plans)}")
+        if notify_min_bedrooms is not None:
+            filter_parts.append(f"{notify_min_bedrooms}+ bedrooms")
+        print(f"ℹ️  Notification filter: {('; '.join(filter_parts)) if filter_parts else 'none'}")
     else:
         print("ℹ️  No notifications configured")
         print("   - WeChat: add token to secrets/wechat_token.txt")
@@ -773,6 +786,7 @@ Examples:
         wechat_token=wechat_token, 
         wechat_method=args.wechat_method,
         notify_floor_plans=notify_floor_plans,
+        notify_min_bedrooms=notify_min_bedrooms,
         email_to=email_to,
         email_from=email_from,
         smtp_server=smtp_server,
