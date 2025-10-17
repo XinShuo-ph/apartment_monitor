@@ -1,6 +1,6 @@
 # Apartment Availability Monitor
 
-Automated apartment availability monitoring for Hanover Winchester apartments. Sends real-time notifications via WeChat and Email when apartments become available or are removed.
+Automated apartment availability monitoring for Windsor Winchester apartments. Sends real-time notifications via WeChat and Email when apartments become available or are removed.
 
 ## Features
 
@@ -105,6 +105,17 @@ python apartment_monitor.py --wechat-method serverchan
 **Show browser (debug mode):**
 ```bash
 python apartment_monitor.py --no-headless
+```
+
+**Override the floorplans URL:**
+```bash
+python apartment_monitor.py --url https://windsorwinchester.com/floorplans/
+```
+
+You can also set the URL via environment variable:
+```bash
+export APARTMENT_URL="https://windsorwinchester.com/floorplans/"
+python apartment_monitor.py
 ```
 
 **View all options:**
@@ -219,7 +230,7 @@ brew upgrade chromedriver
 ### No Apartments Detected
 
 - Check your internet connection
-- Verify the website is accessible: https://hanoverwinchester.com/floorplans/
+- Verify the website is accessible: https://windsorwinchester.com/floorplans/
 - Run with `--no-headless` to see browser activity
 
 ## Technologies Used
