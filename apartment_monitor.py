@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Apartment Availability Monitor
-Monitors https://hanoverwinchester.com/floorplans/ for apartment availability changes
+Monitors https://windsorwinchester.com/floorplans/ for apartment availability changes
 Checks every 20 seconds and notifies when changes are detected
 """
 
@@ -110,7 +110,7 @@ class ApartmentMonitor:
         """
         try:
             # Navigate to the floor plan page with # to trigger availability display
-            url = f"https://hanoverwinchester.com/floorplans/{plan_name.lower()}/#"
+            url = f"https://windsorwinchester.com/floorplans/{plan_name.lower()}/#"
             self.driver.get(url)
             time.sleep(3)  # Wait for page and JavaScript to load
             
@@ -658,7 +658,7 @@ class ApartmentMonitor:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Monitor apartment availability on Hanover Winchester',
+        description='Monitor apartment availability on Windsor Winchester',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -698,7 +698,7 @@ Examples:
     
     args = parser.parse_args()
     
-    url = "https://hanoverwinchester.com/floorplans/"
+    url = "https://windsorwinchester.com/floorplans/"
     
     # Read WeChat token from secrets folder or environment variable
     wechat_token = None
