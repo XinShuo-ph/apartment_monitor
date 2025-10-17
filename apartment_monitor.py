@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Apartment Availability Monitor
-Monitors https://hanoverwinchester.com/floorplans/ for apartment availability changes
+Monitors Windsor Winchester floorplans for apartment availability changes
 Checks every 20 seconds and notifies when changes are detected
 """
 
@@ -110,7 +110,9 @@ class ApartmentMonitor:
         """
         try:
             # Navigate to the floor plan page with # to trigger availability display
-            url = f"https://hanoverwinchester.com/floorplans/{plan_name.lower()}/#"
+            # Respect configurable base URL (e.g., https://windsorwinchester.com/floorplans/)
+            base = self.url.rstrip('/')
+            url = f"{base}/{plan_name.lower()}/#"
             self.driver.get(url)
             time.sleep(3)  # Wait for page and JavaScript to load
             
@@ -658,7 +660,7 @@ class ApartmentMonitor:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(
-        description='Monitor apartment availability on Hanover Winchester',
+        description='Monitor apartment availability on Windsor Winchester',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -673,6 +675,9 @@ Examples:
   
   # Disable headless mode (show browser)
   python apartment_monitor.py --no-headless
+  
+  # Override base floorplans URL
+  python apartment_monitor.py --url https://windsorwinchester.com/floorplans/
         """
     )
     
@@ -696,9 +701,17 @@ Examples:
         help='Show browser window (default: headless mode)'
     )
     
+    parser.add_argument(
+        '--url',
+        type=str,
+        default=None,
+        help='Base floorplans URL (e.g., https://windsorwinchester.com/floorplans/)'
+    )
+    
     args = parser.parse_args()
     
-    url = "https://hanoverwinchester.com/floorplans/"
+    # Determine base URL (CLI flag > env var > default Windsor Winchester)
+    url = args.url or os.environ.get('APARTMENT_URL') or "https://windsorwinchester.com/floorplans/"
     
     # Read WeChat token from secrets folder or environment variable
     wechat_token = None
