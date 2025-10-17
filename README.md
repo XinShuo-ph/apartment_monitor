@@ -1,12 +1,12 @@
 # Apartment Availability Monitor
 
-Automated apartment availability monitoring for Hanover Winchester apartments. Sends real-time notifications via WeChat and Email when apartments become available or are removed.
+Automated apartment availability monitoring for Windsor Winchester apartments. Sends real-time notifications via WeChat and Email when apartments become available or are removed.
 
 ## Features
 
 ✨ **Real-time Monitoring**
 - Checks apartment availability every 20 seconds
-- Monitors all floor plans (A-V)
+- Monitors all available homes on Windsor Winchester
 - Tracks specific unit numbers (e.g., #758, #322, #410)
 
 📱 **Multi-channel Notifications**
@@ -155,11 +155,15 @@ Floor Plan U: #499
 
 ### Notification Filter
 
-By default, only notifies for 2+ bedroom floor plans (N, O, P, Q, R, S, T, U, V).
+By default, only notifies for 2+ bedroom homes on Windsor Winchester.
 
 To modify, edit `apartment_monitor.py`:
 ```python
-notify_floor_plans = ['N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V']
+# Filter by plan letters (optional)
+notify_floor_plans = None  # e.g., ['A', 'B']
+
+# Filter by minimum bedrooms (optional)
+notify_min_bedrooms = 2    # set to None to include all
 ```
 
 ### Check Interval
@@ -219,7 +223,7 @@ brew upgrade chromedriver
 ### No Apartments Detected
 
 - Check your internet connection
-- Verify the website is accessible: https://hanoverwinchester.com/floorplans/
+- Verify the website is accessible: https://www.windsorcommunities.com/properties/windsor-winchester/floorplans/
 - Run with `--no-headless` to see browser activity
 
 ## Technologies Used
